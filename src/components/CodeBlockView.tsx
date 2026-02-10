@@ -1,34 +1,24 @@
 "use client";
 
 import { NodeViewContent, NodeViewWrapper } from "@tiptap/react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export default function CodeBlockView() {
   const [copied, setCopied] = useState(false);
+  const preRef = useRef<HTMLPreElement>(null);
 
   const handleCopy = async () => {
-    const codeEl = document.querySelector(".ProseMirror pre.active-code-block code");
-    if (!codeEl) return;
+    const text = preRef.current?.textContent || "";
     try {
-      await navigator.clipboard.writeText(codeEl.textContent || "");
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { /* noop */ }
   };
 
   return (
-    <NodeViewWrapper
-      className="active-code-block-wrapper relative group"
-      onMouseEnter={(e: React.MouseEvent) => {
-        const pre = e.currentTarget.querySelector("pre");
-        pre?.classList.add("active-code-block");
-      }}
-      onMouseLeave={(e: React.MouseEvent) => {
-        const pre = e.currentTarget.querySelector("pre");
-        pre?.classList.remove("active-code-block");
-      }}
-    >
-      <pre className="relative">
+    <NodeViewWrapper className="relative group">
+      <pre ref={preRef} className="relative">
         <button
           type="button"
           onClick={handleCopy}
@@ -37,7 +27,7 @@ export default function CodeBlockView() {
         >
           {copied ? "已复制 ✓" : "复制"}
         </button>
-        <NodeViewContent as="code" />
+        <NodeViewContent />
       </pre>
     </NodeViewWrapper>
   );
