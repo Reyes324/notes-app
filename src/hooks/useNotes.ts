@@ -1,12 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Note } from "@/types/note";
 
 const STORAGE_KEY = "notes-app-data";
 
-function loadNotes(): Note[] {
-  if (typeof window === "undefined") return [];
+async function fetchNotes(): Promise<Note[]> {
+  const res = await fetch("/api/notes");
+  if (!res.ok) throw new Error("fetch failed");
+  return res.json();
+}
+
+async function saveRemote(notes: Note[]) {
+  await fetch("/api/notes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(notes),
+  });
+}
+
+function loadLocal(): Note[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -15,21 +28,44 @@ function loadNotes(): Note[] {
   }
 }
 
-function saveNotes(notes: Note[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-}
-
 export function useNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const savingRef = useRef(false);
 
+  // Load: try remote first, fallback to localStorage, auto-migrate
   useEffect(() => {
-    setNotes(loadNotes());
-    setLoaded(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const remote = await fetchNotes();
+        if (cancelled) return;
+
+        if (remote.length > 0) {
+          setNotes(remote);
+        } else {
+          // Remote empty — migrate localStorage data if any
+          const local = loadLocal();
+          if (local.length > 0) {
+            setNotes(local);
+            await saveRemote(local);
+          }
+        }
+      } catch {
+        // Offline — fall back to localStorage
+        if (!cancelled) setNotes(loadLocal());
+      }
+      if (!cancelled) setLoaded(true);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
+  // Save to remote + localStorage on every change
   useEffect(() => {
-    if (loaded) saveNotes(notes);
+    if (!loaded || savingRef.current) return;
+    savingRef.current = true;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+    saveRemote(notes).catch(() => {}).finally(() => { savingRef.current = false; });
   }, [notes, loaded]);
 
   const addNote = useCallback(
