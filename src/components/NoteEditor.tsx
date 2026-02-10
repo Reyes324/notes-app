@@ -47,7 +47,7 @@ function ToolbarButton({ onClick, isActive, title, children }: ToolbarButtonProp
 export default function NoteEditor({ note, categories, onChange }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [categoryId, setCategoryId] = useState(note.categoryId);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const debouncedChange = useCallback(
     (data: Partial<Pick<Note, "title" | "content" | "categoryId">>) => {
