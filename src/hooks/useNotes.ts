@@ -31,7 +31,7 @@ function loadLocal(): Note[] {
 export function useNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const savingRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Load: try remote first, fallback to localStorage, auto-migrate
   useEffect(() => {
@@ -60,12 +60,14 @@ export function useNotes() {
     return () => { cancelled = true; };
   }, []);
 
-  // Save to remote + localStorage on every change
+  // Save to localStorage immediately, debounce remote save
   useEffect(() => {
-    if (!loaded || savingRef.current) return;
-    savingRef.current = true;
+    if (!loaded) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-    saveRemote(notes).catch(() => {}).finally(() => { savingRef.current = false; });
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      saveRemote(notes).catch(() => {});
+    }, 500);
   }, [notes, loaded]);
 
   const addNote = useCallback(
