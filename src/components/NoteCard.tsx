@@ -36,7 +36,7 @@ export default function NoteCard({ note, categories, isActive, onClick, onDelete
   return (
     <div
       onClick={onClick}
-      className={`group cursor-pointer rounded-xl border p-4 transition-all ${
+      className={`group cursor-pointer rounded-xl border p-4 transition-all active:scale-[0.98] ${
         isActive
           ? "border-blue-200 bg-blue-50/50 shadow-sm"
           : "border-transparent hover:border-gray-200 hover:bg-gray-50/80"
@@ -51,7 +51,7 @@ export default function NoteCard({ note, categories, isActive, onClick, onDelete
             e.stopPropagation();
             onDelete();
           }}
-          className="ml-2 shrink-0 rounded p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+          className="ml-2 shrink-0 rounded p-2 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2 -mt-2"
           title="删除"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

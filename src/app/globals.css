@@ -6,9 +6,22 @@
 
 body {
   overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+  overscroll-behavior: contain;
 }
 
-/* 自定义滚动条 */
+/* Safe area for notch / home indicator */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -26,9 +39,50 @@ body {
   background: #d1d5db;
 }
 
-/* Tiptap 编辑器样式 */
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    width: 0;
+    display: none;
+  }
+
+  * {
+    scrollbar-width: none;
+  }
+}
+
+/* Note title placeholder via contentEditable empty state */
+.note-title:empty::before {
+  content: attr(data-placeholder);
+  color: #d1d5db;
+  pointer-events: none;
+}
+
+.note-title {
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* Prevent line breaks in title - keep single line behavior */
+.note-title br {
+  display: none;
+}
+
+.note-title * {
+  display: inline;
+}
+
+/* Tiptap editor styles */
 .tiptap {
   line-height: 1.75;
+  font-size: 1rem;
+}
+
+@media (max-width: 767px) {
+  .tiptap {
+    font-size: 1rem;
+    line-height: 1.8;
+  }
 }
 
 .tiptap p.is-editor-empty:first-child::before {

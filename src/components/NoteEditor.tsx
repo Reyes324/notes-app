@@ -18,6 +18,7 @@ interface NoteEditorProps {
   note: Note;
   categories: CategoryItem[];
   onChange: (data: Partial<Pick<Note, "title" | "content" | "categoryId">>) => void;
+  onBack?: () => void;
 }
 
 interface ToolbarButtonProps {
@@ -33,7 +34,7 @@ function ToolbarButton({ onClick, isActive, title, children }: ToolbarButtonProp
       type="button"
       onClick={onClick}
       title={title}
-      className={`rounded p-1.5 text-sm transition-colors ${
+      className={`rounded p-2 text-sm transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
         isActive
           ? "bg-blue-100 text-blue-700"
           : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -44,10 +45,12 @@ function ToolbarButton({ onClick, isActive, title, children }: ToolbarButtonProp
   );
 }
 
-export default function NoteEditor({ note, categories, onChange }: NoteEditorProps) {
+export default function NoteEditor({ note, categories, onChange, onBack }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [categoryId, setCategoryId] = useState(note.categoryId);
+  const [showCatPicker, setShowCatPicker] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const titleRef = useRef<HTMLDivElement>(null);
 
   const debouncedChange = useCallback(
     (data: Partial<Pick<Note, "title" | "content" | "categoryId">>) => {
@@ -72,96 +75,205 @@ export default function NoteEditor({ note, categories, onChange }: NoteEditorPro
     },
     editorProps: {
       attributes: {
-        class: "prose prose-sm max-w-none outline-none min-h-[calc(100vh-280px)] text-gray-600",
+        class: "prose prose-sm max-w-none outline-none min-h-[200px] md:min-h-[calc(100vh-280px)] text-gray-600",
       },
     },
   });
 
-  const handleTitleChange = (val: string) => {
-    setTitle(val);
-    debouncedChange({ title: val });
+  // Set initial title content
+  useEffect(() => {
+    if (titleRef.current && titleRef.current.textContent !== note.title) {
+      titleRef.current.textContent = note.title;
+    }
+  }, [note.title]);
+
+  const handleTitleInput = () => {
+    if (!titleRef.current) return;
+    const text = titleRef.current.textContent || "";
+    setTitle(text);
+    debouncedChange({ title: text });
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // Focus the Tiptap editor at the beginning
+      if (editor) {
+        editor.chain().focus("start").run();
+      }
+    }
+  };
+
+  const handleTitlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    const lines = text.split(/\r?\n/);
+    const firstLine = lines[0] || "";
+    const restLines = lines.slice(1).join("\n").trim();
+
+    // Set first line as title
+    if (titleRef.current) {
+      titleRef.current.textContent = firstLine;
+      setTitle(firstLine);
+      debouncedChange({ title: firstLine });
+    }
+
+    // Insert remaining lines into the editor body
+    if (restLines && editor) {
+      // Convert remaining text to HTML paragraphs
+      const htmlContent = restLines
+        .split(/\r?\n/)
+        .map((line) => (line.trim() ? `<p>${line}</p>` : "<p></p>"))
+        .join("");
+
+      // If editor is empty, set content; otherwise insert at start
+      const currentContent = editor.getHTML();
+      if (!currentContent || currentContent === "<p></p>") {
+        editor.commands.setContent(htmlContent);
+      } else {
+        editor.chain().focus("start").insertContent(htmlContent).run();
+      }
+    }
   };
 
   const handleCategoryChange = (id: string) => {
     setCategoryId(id);
     onChange({ categoryId: id });
+    setShowCatPicker(false);
   };
+
+  const activeCat = categories.find((c) => c.id === categoryId);
+  const activeCatStyle = activeCat ? getCategoryStyle(activeCat.color) : null;
 
   return (
     <div className="flex h-full flex-col">
-      {/* 顶部：分类选择 */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-3">
+      {/* Top bar: back button (mobile) + category */}
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 md:px-6 py-2 md:py-3">
         <div className="flex items-center gap-2">
-          {categories.map((c) => {
-            const style = getCategoryStyle(c.color);
-            return (
-              <button
-                key={c.id}
-                onClick={() => handleCategoryChange(c.id)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                  categoryId === c.id
-                    ? `${style.bg} ${style.text}`
-                    : "bg-gray-50 text-gray-400 hover:bg-gray-100"
-                }`}
-              >
-                {c.name}
-              </button>
-            );
-          })}
+          {/* Mobile back button */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="md:hidden rounded-lg p-2 text-gray-400 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+
+          {/* Desktop: show all category chips */}
+          <div className="hidden md:flex items-center gap-2">
+            {categories.map((c) => {
+              const style = getCategoryStyle(c.color);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => handleCategoryChange(c.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                    categoryId === c.id
+                      ? `${style.bg} ${style.text}`
+                      : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Mobile: compact category picker */}
+          <div className="md:hidden relative">
+            <button
+              onClick={() => setShowCatPicker(!showCatPicker)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium min-h-[36px] flex items-center gap-1 ${
+                activeCatStyle
+                  ? `${activeCatStyle.bg} ${activeCatStyle.text}`
+                  : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {activeCat?.name || "选择分类"}
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showCatPicker && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowCatPicker(false)} />
+                <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-gray-200 py-1 min-w-[140px]">
+                  {categories.map((c) => {
+                    const style = getCategoryStyle(c.color);
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => handleCategoryChange(c.id)}
+                        className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 min-h-[44px] ${
+                          categoryId === c.id ? "bg-gray-50 font-medium" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+                        {c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-        <span className="text-xs text-gray-300">自动保存</span>
+        <span className="text-xs text-gray-300 hidden md:inline">自动保存</span>
       </div>
 
-      {/* 格式工具栏 */}
+      {/* Format toolbar */}
       {editor && (
-        <div className="flex items-center gap-0.5 border-b border-gray-100 px-6 py-2">
+        <div className="flex items-center gap-0.5 border-b border-gray-100 px-4 md:px-6 py-1 md:py-2 overflow-x-auto">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
             isActive={editor.isActive("heading", { level: 1 })}
             title="标题 1"
           >
-            <span className="font-bold">H1</span>
+            <span className="font-bold text-xs">H1</span>
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
             isActive={editor.isActive("heading", { level: 2 })}
             title="标题 2"
           >
-            <span className="font-bold">H2</span>
+            <span className="font-bold text-xs">H2</span>
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
             isActive={editor.isActive("heading", { level: 3 })}
             title="标题 3"
           >
-            <span className="font-bold">H3</span>
+            <span className="font-bold text-xs">H3</span>
           </ToolbarButton>
 
-          <div className="mx-1.5 h-4 w-px bg-gray-200" />
+          <div className="mx-1 h-4 w-px bg-gray-200 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             isActive={editor.isActive("bold")}
             title="加粗"
           >
-            <span className="font-bold">B</span>
+            <span className="font-bold text-xs">B</span>
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
             isActive={editor.isActive("italic")}
             title="斜体"
           >
-            <span className="italic">I</span>
+            <span className="italic text-xs">I</span>
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleStrike().run()}
             isActive={editor.isActive("strike")}
             title="删除线"
           >
-            <span className="line-through">S</span>
+            <span className="line-through text-xs">S</span>
           </ToolbarButton>
 
-          <div className="mx-1.5 h-4 w-px bg-gray-200" />
+          <div className="mx-1 h-4 w-px bg-gray-200 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -196,7 +308,7 @@ export default function NoteEditor({ note, categories, onChange }: NoteEditorPro
             </svg>
           </ToolbarButton>
 
-          <div className="mx-1.5 h-4 w-px bg-gray-200" />
+          <div className="mx-1 h-4 w-px bg-gray-200 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleCode().run()}
@@ -215,7 +327,7 @@ export default function NoteEditor({ note, categories, onChange }: NoteEditorPro
             <span className="font-mono text-xs">{"{}"}</span>
           </ToolbarButton>
 
-          <div className="mx-1.5 h-4 w-px bg-gray-200" />
+          <div className="mx-1 h-4 w-px bg-gray-200 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
@@ -226,15 +338,19 @@ export default function NoteEditor({ note, categories, onChange }: NoteEditorPro
         </div>
       )}
 
-      {/* 编辑区域 */}
-      <div className="flex-1 overflow-auto px-6 py-4">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="输入标题..."
-          className="mb-4 w-full text-2xl font-bold text-gray-800 outline-none placeholder:text-gray-300"
-          autoFocus
+      {/* Editor area - title and body in same scrollable container for seamless selection */}
+      <div className="flex-1 overflow-auto px-4 md:px-6 py-4">
+        <div
+          ref={titleRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleTitleInput}
+          onKeyDown={handleTitleKeyDown}
+          onPaste={handleTitlePaste}
+          data-placeholder="输入标题..."
+          className="note-title mb-4 w-full text-2xl font-bold text-gray-800 outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300 empty:before:pointer-events-none"
+          role="textbox"
+          aria-label="笔记标题"
         />
         <EditorContent editor={editor} />
       </div>

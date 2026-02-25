@@ -31,7 +31,7 @@ function loadLocal(): Note[] {
 export function useNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Load: try remote first, fallback to localStorage, auto-migrate
   useEffect(() => {
