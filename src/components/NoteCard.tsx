@@ -42,8 +42,8 @@ export default function NoteCard({ note, categories, isActive, onClick, onDelete
           : "border-transparent hover:border-gray-200 hover:bg-gray-50/80"
       }`}
     >
-      <div className="mb-2 flex items-start justify-between">
-        <h3 className="text-sm font-semibold text-gray-800 line-clamp-1">
+      <div className="mb-1 flex items-start justify-between">
+        <h3 className="text-base font-semibold text-gray-800 line-clamp-1">
           {note.title || "无标题"}
         </h3>
         <button
@@ -60,7 +60,7 @@ export default function NoteCard({ note, categories, isActive, onClick, onDelete
         </button>
       </div>
       {note.content && (
-        <p className="mb-3 text-xs text-gray-400 line-clamp-2 leading-relaxed">
+        <p className="mb-2 text-xs text-gray-400 line-clamp-2 leading-relaxed">
           {stripHtml(note.content)}
         </p>
       )}
