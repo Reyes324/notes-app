@@ -105,7 +105,7 @@ export default function Home() {
 
   if (!notesLoaded || !catsLoaded) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-[#faf8f5]">
+      <div className="flex h-dvh items-center justify-center bg-[#f7f3ed]">
         <div className="text-gray-400">加载中...</div>
       </div>
     );
@@ -117,7 +117,7 @@ export default function Home() {
     : "全部";
 
   return (
-    <div className="flex h-dvh bg-[#faf8f5] overflow-hidden">
+    <div className="flex h-dvh bg-[#f7f3ed] overflow-hidden">
       {/* Sidebar */}
       <aside
         className={`flex w-full md:w-60 shrink-0 flex-col border-r border-gray-200 bg-white
@@ -126,8 +126,7 @@ export default function Home() {
         {/* Mobile sidebar header */}
         <div className="flex items-center justify-between px-5 pt-6 pb-4 md:block">
           <div>
-            <h1 className="text-lg font-bold text-gray-800">写作记录区</h1>
-            <p className="mt-1 text-xs text-gray-400">记录每一个灵感</p>
+            <h1 className="text-lg font-bold text-gray-800">记事本</h1>
           </div>
           <button
             onClick={() => setMobileView("list")}
