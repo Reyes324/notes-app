@@ -29,9 +29,16 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/&[^;]+;/g, " ").trim();
 }
 
+function firstImageSrc(html: string): string | null {
+  const m = html.match(/<img[^>]+src="([^"]+)"/);
+  return m ? m[1] : null;
+}
+
 export default function NoteCard({ note, categories, isActive, onClick, onDelete }: NoteCardProps) {
   const cat = categories.find((c) => c.id === note.categoryId);
   const style = cat ? getCategoryStyle(cat.color) : null;
+  const preview = stripHtml(note.content);
+  const thumb = firstImageSrc(note.content);
 
   return (
     <div
@@ -59,10 +66,18 @@ export default function NoteCard({ note, categories, isActive, onClick, onDelete
           </svg>
         </button>
       </div>
-      {note.content && (
-        <p className="mb-2 text-xs text-gray-400 line-clamp-2 leading-relaxed">
-          {stripHtml(note.content)}
-        </p>
+      {(preview || thumb) && (
+        <div className="mb-2 flex items-start gap-3">
+          {preview ? (
+            <p className="flex-1 text-xs text-gray-400 line-clamp-2 leading-relaxed">{preview}</p>
+          ) : (
+            <p className="flex-1 text-xs text-gray-300">[图片]</p>
+          )}
+          {thumb && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumb} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" loading="lazy" />
+          )}
+        </div>
       )}
       <div className="flex items-center justify-between">
         {cat && style ? (

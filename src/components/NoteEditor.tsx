@@ -5,8 +5,11 @@ import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CodeBlockLowlight from "@tiptap/extension-code-block";
+import Image from "@tiptap/extension-image";
+import type { Editor } from "@tiptap/react";
 import { Note, CategoryItem, getCategoryStyle } from "@/types/note";
 import CodeBlockView from "./CodeBlockView";
+import { isSupportedImage, uploadImage } from "@/lib/image";
 
 const CustomCodeBlock = CodeBlockLowlight.extend({
   addNodeView() {
@@ -51,11 +54,49 @@ export default function NoteEditor({ note, categories, onChange, onBack }: NoteE
   const [showCatPicker, setShowCatPicker] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const titleRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<Editor | null>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [uploadError, setUploadError] = useState("");
+
+  const insertImages = useCallback(async (files: File[], pos?: number) => {
+    const images = files.filter(isSupportedImage);
+    if (images.length === 0) return false;
+    setUploadError("");
+    setUploadingCount((n) => n + images.length);
+    for (const file of images) {
+      try {
+        const src = await uploadImage(file);
+        const ed = editorRef.current;
+        if (!ed || ed.isDestroyed) return true;
+        const content = { type: "image", attrs: { src, alt: file.name } };
+        if (pos !== undefined) {
+          ed.chain().focus().insertContentAt(pos, content).run();
+          pos = undefined; // 后续图片接在光标后面
+        } else {
+          ed.chain().focus().insertContent(content).run();
+        }
+      } catch {
+        setUploadError("图片上传失败，请重试");
+      } finally {
+        setUploadingCount((n) => n - 1);
+      }
+    }
+    return true;
+  }, []);
+
+  const pendingRef = useRef<Partial<Pick<Note, "title" | "content" | "categoryId">>>({});
 
   const debouncedChange = useCallback(
     (data: Partial<Pick<Note, "title" | "content" | "categoryId">>) => {
+      // 合并待保存字段，避免标题和正文先后编辑时互相覆盖
+      pendingRef.current = { ...pendingRef.current, ...data };
       clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => onChange(data), 300);
+      debounceRef.current = setTimeout(() => {
+        const pending = pendingRef.current;
+        pendingRef.current = {};
+        onChange(pending);
+      }, 300);
     },
     [onChange]
   );
@@ -66,6 +107,7 @@ export default function NoteEditor({ note, categories, onChange, onBack }: NoteE
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       CustomCodeBlock,
+      Image.configure({ allowBase64: true }),
       Placeholder.configure({ placeholder: "写点什么..." }),
     ],
     content: note.content || "",
@@ -74,11 +116,37 @@ export default function NoteEditor({ note, categories, onChange, onBack }: NoteE
       debouncedChange({ content: editor.getHTML() });
     },
     editorProps: {
+      handlePaste: (_view, event) => {
+        const files = Array.from(event.clipboardData?.files ?? []).filter(isSupportedImage);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        insertImages(files);
+        return true;
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false;
+        const files = Array.from(event.dataTransfer?.files ?? []).filter(isSupportedImage);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+        insertImages(files, pos);
+        return true;
+      },
       attributes: {
         class: "prose prose-sm max-w-none outline-none min-h-[200px] md:min-h-[calc(100vh-280px)] text-gray-600",
       },
     },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // 允许重复选择同一文件
+    insertImages(files);
+  };
 
   // Set initial title content
   useEffect(() => {
@@ -221,7 +289,13 @@ export default function NoteEditor({ note, categories, onChange, onBack }: NoteE
             )}
           </div>
         </div>
-        <span className="text-xs text-gray-300 hidden md:inline">自动保存</span>
+        {uploadingCount > 0 ? (
+          <span className="text-xs text-blue-400">图片上传中…</span>
+        ) : uploadError ? (
+          <span className="text-xs text-red-400">{uploadError}</span>
+        ) : (
+          <span className="text-xs text-gray-300 hidden md:inline">自动保存</span>
+        )}
       </div>
 
       {/* Format toolbar */}
@@ -335,6 +409,22 @@ export default function NoteEditor({ note, categories, onChange, onBack }: NoteE
           >
             <span className="text-xs">—</span>
           </ToolbarButton>
+          <ToolbarButton
+            onClick={() => fileInputRef.current?.click()}
+            title="插入图片"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </ToolbarButton>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            hidden
+            onChange={handleFileSelect}
+          />
         </div>
       )}
 

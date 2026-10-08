@@ -185,3 +185,16 @@ body {
 .tiptap s {
   text-decoration: line-through;
 }
+
+.tiptap img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.75rem 0;
+}
+
+.tiptap img.ProseMirror-selectednode {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
